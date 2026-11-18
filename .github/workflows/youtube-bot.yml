@@ -1,0 +1,61 @@
+name: YouTube kontrol
+
+on:
+  schedule:
+    # Her 5 dakikada bir (GitHub'ın izin verdiği en kısa aralık).
+    # Not: GitHub yoğunken çalıştırmalar birkaç dakika gecikebilir.
+    - cron: "*/5 * * * *"
+  workflow_dispatch:   # "Run workflow" düğmesiyle elle çalıştırma
+    inputs:
+      test:
+        description: "Test modu: son videoyu test etiketiyle bir kez gönder"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write      # durum.json'u repoya kaydedebilmek için
+
+concurrency:
+  group: youtube-bot   # iki çalıştırma aynı anda olmasın
+  cancel-in-progress: false
+
+jobs:
+  kontrol:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Botu çalıştır
+        run: python bot.py ${{ inputs.test && '--test' || '--bir-kez' }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_TEST_CHAT_ID: ${{ secrets.TELEGRAM_TEST_CHAT_ID }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          YOUTUBE_CHANNEL_ID: ${{ secrets.YOUTUBE_CHANNEL_ID }}
+          # Gizli olmayan ayarlar burada:
+          PLANLI_YAYIN_BILDIRIMI: "evet"
+          SHORTS_BILDIRIMI: "hayir"
+
+      - name: Hafızayı (durum.json) kaydet
+        if: ${{ !inputs.test }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ ! -f durum.json ]; then echo "Henüz hafıza dosyası yok."; exit 0; fi
+          git add durum.json
+          if git diff --staged --quiet; then
+            echo "Hafızada değişiklik yok."
+          else
+            git commit -m "Bot hafızası güncellendi"
+            git pull --rebase
+            git push
+          fi

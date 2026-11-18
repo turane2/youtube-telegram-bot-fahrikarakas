@@ -1,0 +1,15 @@
+# Gizli bilgiler: ASLA paylaşma
+.env
+
+# Python çöpü
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Bozuk hafıza yedekleri ve loglar
+*.bozuk
+*.log
+
+# NOT: durum.json bilerek burada YOK.
+# GitHub Actions botun hafızasını bu dosyada repoya kaydediyor.
