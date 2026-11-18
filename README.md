@@ -189,6 +189,14 @@ Repo sayfası → **Settings** → sol menü **Secrets and variables** → **Act
 - **60 gün kuralı:** Public repolarda 60 gün hiç hareket olmazsa GitHub zamanlamayı durdurur.
   Bot yeni video geldikçe `durum.json`'u kaydettiği için aktif bir kanalda bu sorun olmaz. Olursa
   GitHub e-posta atar. **Actions** sekmesinden tekrar **Enable** demen yeterli.
+- **Bu repoda kullanılan çözüm: cron-job.org.** GitHub'ın zamanlayıcısı yeni repoda saatlerce hiç
+  çalışmadı. Bu yüzden ücretsiz https://cron-job.org her 2 dakikada bir şu adrese `POST` atıyor:
+  `https://api.github.com/repos/turane2/youtube-telegram-bot-fahrikarakas/actions/workflows/youtube-bot.yml/dispatches`
+  Header'lar: `Authorization: Bearer <token>`, `Accept: application/vnd.github+json`,
+  `Content-Type: application/json`. Body: `{"ref":"main"}`. Başarılı cevap: **204**.
+  Token: GitHub → Settings → Developer settings → Fine-grained token, sadece bu repo, sadece
+  **Actions: Read and write**. **Token'ın süresi dolunca** yenisini oluşturup cron-job.org'daki
+  `Authorization` header'ına yapıştır, yoksa bot durur.
 - Daha hızlı ve kesin bildirim istersen ileride aynı kod bir VPS'te `python bot.py` ile 3 dakikada bir çalıştırılabilir.
 
 ## 7. Ayarları değiştirme
