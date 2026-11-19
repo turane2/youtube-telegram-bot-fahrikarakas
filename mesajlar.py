@@ -34,6 +34,24 @@ CANLI_BASLADI = (
     "📺 Hemen katıl: {link}"
 )
 
+# İlk gösterim (prömiyer) planlandığında
+PROMIYER_PLANLANDI = (
+    "🎞️ <b>İlk gösterim planlandı:</b> {tarih}\n"
+    "\n"
+    "{baslik}\n"
+    "\n"
+    "🔔 Hatırlatıcı kur: {link}"
+)
+
+# İlk gösterim (prömiyer) başladığında
+PROMIYER_BASLADI = (
+    "🎞️ <b>İlk gösterim başladı!</b>\n"
+    "\n"
+    "{baslik}\n"
+    "\n"
+    "▶️ Birlikte izleyelim: {link}"
+)
+
 # Shorts (sadece SHORTS_BILDIRIMI=evet ise kullanılır)
 YENI_SHORTS = (
     "📱 <b>Yeni Shorts!</b>\n"

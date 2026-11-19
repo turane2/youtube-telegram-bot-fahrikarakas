@@ -99,6 +99,18 @@ def baslik(item: dict) -> str:
     return item.get("snippet", {}).get("title", "")
 
 
+def planli_sablonu(item: dict) -> str:
+    return mesajlar.PROMIYER_PLANLANDI if youtube.promiyer_mu(item) else mesajlar.YAYIN_PLANLANDI
+
+
+def basladi_sablonu(item: dict) -> str:
+    return mesajlar.PROMIYER_BASLADI if youtube.promiyer_mu(item) else mesajlar.CANLI_BASLADI
+
+
+def tur_adi(item: dict) -> str:
+    return "İlk gösterim" if youtube.promiyer_mu(item) else "Canlı yayın"
+
+
 # ---------------------------------------------------------------- ana mantık
 
 def normal_video_isle(item: dict, ayar: Ayarlar, hafiza: Hafiza, bildirici: Bildirici) -> None:
@@ -125,17 +137,17 @@ def yeni_video_isle(item: dict, ayar: Ayarlar, hafiza: Hafiza, bildirici: Bildir
     if tur == "planlandi":
         planli = (item.get("liveStreamingDetails") or {}).get("scheduledStartTime")
         if ayar.planli_bildirim:
-            if not bildirici.gonder(mesajlar.YAYIN_PLANLANDI, item):
+            if not bildirici.gonder(planli_sablonu(item), item):
                 log.warning("Planlı yayın bildirimi gönderilemedi, tekrar denenecek: %s", baslik(item))
                 return
-            log.info("📅 Planlı yayın bildirildi: %s (%s)", baslik(item), turkce_tarih(planli))
+            log.info("📅 %s planlandı, bildirildi: %s (%s)", tur_adi(item), baslik(item), turkce_tarih(planli))
         else:
             log.info("📅 Planlı yayın takibe alındı (bildirim kapalı): %s", baslik(item))
         hafiza.yaz(vid, "planlandi", baslik(item), planlanan=planli, kayip=0)
 
     elif tur == "canli":
-        if bildirici.gonder(mesajlar.CANLI_BASLADI, item):
-            log.info("🔴 Canlı yayın bildirildi: %s", baslik(item))
+        if bildirici.gonder(basladi_sablonu(item), item):
+            log.info("🔴 %s başladı, bildirildi: %s", tur_adi(item), baslik(item))
             hafiza.yaz(vid, "canli", baslik(item))
         else:
             log.warning("Canlı yayın bildirimi gönderilemedi, tekrar denenecek: %s", baslik(item))
@@ -169,8 +181,8 @@ def takip_isle(vid: str, item: dict | None, ayar: Ayarlar, hafiza: Hafiza, bildi
         return
 
     if tur == "canli":
-        if bildirici.gonder(mesajlar.CANLI_BASLADI, item):
-            log.info("🔴 Canlı yayın başladı, bildirildi: %s", baslik(item))
+        if bildirici.gonder(basladi_sablonu(item), item):
+            log.info("🔴 %s başladı, bildirildi: %s", tur_adi(item), baslik(item))
             hafiza.yaz(vid, "canli", baslik(item))
         else:
             log.warning("Canlı yayın bildirimi gönderilemedi, tekrar denenecek: %s", baslik(item))
@@ -251,7 +263,7 @@ def test_modu(ayar: Ayarlar, kuru: bool) -> int:
         return 1
 
     tur = youtube.video_turu(item)
-    sablon = {"planlandi": mesajlar.YAYIN_PLANLANDI, "canli": mesajlar.CANLI_BASLADI}.get(tur)
+    sablon = {"planlandi": planli_sablonu(item), "canli": basladi_sablonu(item)}.get(tur)
     if sablon is None:
         sure = youtube.sure_saniye(item)
         sablon = mesajlar.YENI_SHORTS if youtube.shorts_mu(item["id"], sure) else mesajlar.YENI_VIDEO

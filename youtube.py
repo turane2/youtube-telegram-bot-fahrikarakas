@@ -112,6 +112,17 @@ def sure_saniye(item: dict) -> int | None:
     return g * 86400 + s * 3600 + d * 60 + sn
 
 
+def promiyer_mu(item: dict) -> bool:
+    """
+    İlk gösterim (prömiyer) mi, gerçek canlı yayın mı?
+    API ikisini de 'upcoming/live' gösterir. Fark: prömiyer önceden yüklenmiş bir video olduğu için
+    süresi bellidir; gerçek canlı yayının süresi yayın bitene kadar 0'dır.
+    """
+    if not item.get("liveStreamingDetails"):
+        return False
+    return (sure_saniye(item) or 0) > 0
+
+
 def shorts_mu(video_id: str, sure: int | None) -> bool:
     """
     API'de 'Shorts' alanı yok. youtube.com/shorts/ID adresi Shorts için açılır (200),

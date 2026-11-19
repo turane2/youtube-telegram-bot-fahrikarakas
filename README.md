@@ -8,6 +8,7 @@ Telegram grubuna/kanalına otomatik mesaj atar. GitHub Actions üzerinde **ücre
 | Yeni video                   | 🎬 Yeni video! + başlık + link + küçük resim    |
 | Canlı yayın planlandı        | 📅 Yayın planlandı: 21 Kasım 2026 Cumartesi, 20:00 |
 | Canlı yayın başladı          | 🔴 Canlı yayın başladı!                          |
+| İlk gösterim (prömiyer) planlandı / başladı | 🎞️ İlk gösterim planlandı: ... / 🎞️ İlk gösterim başladı! |
 | Shorts                       | Bildirilmez (istersen açılabilir)              |
 
 **Nasıl çalışır?** Her 5 dakikada bir kanalın RSS akışına bakar (kota harcamaz). Yeni bir şey
