@@ -314,7 +314,6 @@ def incele_modu(ayar: Ayarlar, videolar: str) -> int:
             "contentDetails": item.get("contentDetails"),
             "status": item.get("status"),
             "liveStreamingDetails": item.get("liveStreamingDetails"),
-            "sayfa_isLiveContent": youtube.canli_icerik_mi(vid),
             "bot_tur": youtube.video_turu(item),
             "bot_promiyer_mu": youtube.promiyer_mu(item),
         }
