@@ -295,6 +295,32 @@ def mesaj_id_coz(metin: str) -> int | None:
     return int(sayilar[-1]) if sayilar else None
 
 
+def incele_modu(ayar: Ayarlar, videolar: str) -> int:
+    """Videoların API'de nasıl göründüğünü loga yazar (sorun ayıklamak için). Hiçbir şey göndermez."""
+    import json
+    idler = [v for v in (video_id_coz(p) for p in re.split(r"[\s,]+", videolar) if p) if v]
+    if not idler:
+        log.error("İncelenecek video linki anlaşılamadı: '%s'", videolar)
+        return 1
+    detay = youtube.video_detaylari(idler, ayar.youtube_api_key)
+    for vid in idler:
+        item = detay.get(vid)
+        if not item:
+            log.warning("İNCELEME %s: YouTube bilgi vermedi.", vid)
+            continue
+        ozet = {
+            "baslik": baslik(item),
+            "liveBroadcastContent": item["snippet"].get("liveBroadcastContent"),
+            "contentDetails": item.get("contentDetails"),
+            "status": item.get("status"),
+            "liveStreamingDetails": item.get("liveStreamingDetails"),
+            "bot_tur": youtube.video_turu(item),
+            "bot_promiyer_mu": youtube.promiyer_mu(item),
+        }
+        log.info("İNCELEME %s:\n%s", vid, json.dumps(ozet, ensure_ascii=False, indent=2))
+    return 0
+
+
 def duzelt_modu(ayar: Ayarlar, video: str, mesaj: str, kuru: bool) -> int:
     vid, mid = video_id_coz(video), mesaj_id_coz(mesaj)
     if not vid:
@@ -346,6 +372,8 @@ def main() -> int:
 
     if arg.duzelt:
         try:
+            if not arg.duzelt[1].strip():  # mesaj linki boş: sadece incele
+                return incele_modu(ayar, arg.duzelt[0])
             return duzelt_modu(ayar, arg.duzelt[0], arg.duzelt[1], arg.kuru)
         except youtube.YouTubeHatasi as e:
             log.error("%s", e)

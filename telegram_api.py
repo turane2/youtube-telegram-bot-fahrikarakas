@@ -43,6 +43,9 @@ def _istek(token: str, metod: str, veri: dict) -> bool:
             continue
 
         aciklama = cevap.get("description", f"HTTP {r.status_code}")
+        if "message is not modified" in aciklama:
+            log.warning("Mesaj zaten bu haliyle duruyor, değiştirilecek bir şey yok.")
+            return True
         if r.status_code == 401:
             log.error("Telegram token'ı geçersiz (401). TELEGRAM_BOT_TOKEN'ı kontrol et.")
         elif "chat not found" in aciklama.lower():

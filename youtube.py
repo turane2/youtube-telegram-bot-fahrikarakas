@@ -52,7 +52,7 @@ def video_detaylari(idler: list[str], api_key: str) -> dict[str, dict]:
     for i in range(0, len(idler), 50):
         grup = idler[i:i + 50]
         params = {
-            "part": "snippet,liveStreamingDetails,contentDetails",
+            "part": "snippet,liveStreamingDetails,contentDetails,status",
             "id": ",".join(grup),
             "key": api_key,
         }
