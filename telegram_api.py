@@ -10,6 +10,7 @@ log = logging.getLogger("telegram")
 
 API = "https://api.telegram.org/bot{token}/{metod}"
 EN_FAZLA_DENEME = 4
+AYNI = "ayni"  # düzenlemede "mesaj zaten tam olarak bu" cevabı
 
 
 def _gizle(metin: str) -> str:
@@ -44,8 +45,7 @@ def _istek(token: str, metod: str, veri: dict) -> bool:
 
         aciklama = cevap.get("description", f"HTTP {r.status_code}")
         if "message is not modified" in aciklama:
-            log.warning("Mesaj zaten bu haliyle duruyor, değiştirilecek bir şey yok.")
-            return True
+            return AYNI
         if r.status_code == 401:
             log.error("Telegram token'ı geçersiz (401). TELEGRAM_BOT_TOKEN'ı kontrol et.")
         elif "chat not found" in aciklama.lower():
@@ -64,12 +64,16 @@ def _istek(token: str, metod: str, veri: dict) -> bool:
     return False
 
 
-def duzenle(token: str, chat_id: str, mesaj_id: int, metin: str) -> bool:
-    """Botun daha önce gönderdiği bir mesajın yazısını değiştirir (resimli mesajda resim altı yazısı)."""
-    if _istek(token, "editMessageCaption", {
+def duzenle(token: str, chat_id: str, mesaj_id: int, metin: str) -> bool | str:
+    """
+    Botun daha önce gönderdiği bir mesajın yazısını değiştirir (resimli mesajda resim altı yazısı).
+    True: düzenlendi, AYNI: mesaj zaten bu haliyle duruyor, False: olmadı.
+    """
+    sonuc = _istek(token, "editMessageCaption", {
         "chat_id": chat_id, "message_id": mesaj_id, "caption": metin, "parse_mode": "HTML",
-    }):
-        return True
+    })
+    if sonuc:
+        return sonuc
     log.info("Resim altı yazısı düzenlenemedi, düz metin mesajı olarak deneniyor.")
     return _istek(token, "editMessageText", {
         "chat_id": chat_id, "message_id": mesaj_id, "text": metin, "parse_mode": "HTML",

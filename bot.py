@@ -346,7 +346,13 @@ def duzelt_modu(ayar: Ayarlar, video: str, mesaj: str, kuru: bool) -> int:
     if kuru:
         log.info("[KURU MOD, düzenlenmedi]\n----\n%s\n----", metin)
         return 0
-    if telegram_api.duzenle(ayar.telegram_token, ayar.telegram_chat_id, mid, metin):
+    sonuc = telegram_api.duzenle(ayar.telegram_token, ayar.telegram_chat_id, mid, metin)
+    if sonuc == telegram_api.AYNI:
+        log.error("❌ Değişiklik olmadı: mesaj zaten bu şablonla duruyor. "
+                  "Bot videonun türünü yanlış tanıyor olabilir (seçilen şablonun ilk satırı: %s).",
+                  metin.split("\n")[0])
+        return 1
+    if sonuc:
         log.info("✅ Mesaj düzeltildi.")
         return 0
     log.error("❌ Mesaj düzeltilemedi. Link doğru mu, mesajı bu bot mu göndermişti?")
