@@ -1,5 +1,6 @@
 """YouTube tarafı: RSS akışı (kotasız) ve videos.list (1 kota birimi / istek)."""
 
+import functools
 import logging
 import re
 
@@ -112,15 +113,42 @@ def sure_saniye(item: dict) -> int | None:
     return g * 86400 + s * 3600 + d * 60 + sn
 
 
+SAYFA_BASLIKLARI = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                  "(KHTML, like Gecko) Chrome/130 Safari/537.36",
+    "Accept-Language": "tr,en;q=0.8",
+    "Cookie": "CONSENT=YES+cb; SOCS=CAI",  # çerez onay sayfasına düşmesin
+}
+
+
+@functools.lru_cache(maxsize=64)
+def canli_icerik_mi(video_id: str) -> bool | None:
+    """
+    Video sayfasındaki "isLiveContent" alanı: gerçek canlı yayında true,
+    prömiyer ve normal videoda false. Sayfaya ulaşılamazsa None.
+    """
+    try:
+        r = requests.get(f"https://www.youtube.com/watch?v={video_id}",
+                         headers=SAYFA_BASLIKLARI, timeout=ZAMAN_ASIMI)
+        m = re.search(r'"isLiveContent":(true|false)', r.text)
+        if m:
+            return m.group(1) == "true"
+        log.warning("Video sayfasında canlı/prömiyer bilgisi bulunamadı (%s).", video_id)
+    except requests.RequestException as e:
+        log.warning("Video sayfasına ulaşılamadı (%s): %s", video_id, e)
+    return None
+
+
 def promiyer_mu(item: dict) -> bool:
     """
     İlk gösterim (prömiyer) mi, gerçek canlı yayın mı?
-    API ikisini de 'upcoming/live' gösterir. Fark: prömiyer önceden yüklenmiş bir video olduğu için
-    süresi bellidir; gerçek canlı yayının süresi yayın bitene kadar 0'dır.
+    API ikisini de 'upcoming/live' gösterir ve ayıran bir alan vermez. Bu yüzden video sayfasına
+    bakılır (isLiveContent). Sayfa okunamazsa canlı yayın sayılır (🔴 gitmesi, hiç gitmemesinden iyi).
     """
     if not item.get("liveStreamingDetails"):
         return False
-    return (sure_saniye(item) or 0) > 0
+    canli = canli_icerik_mi(item["id"])
+    return canli is False
 
 
 def shorts_mu(video_id: str, sure: int | None) -> bool:
