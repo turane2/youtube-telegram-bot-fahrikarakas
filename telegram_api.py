@@ -61,6 +61,18 @@ def _istek(token: str, metod: str, veri: dict) -> bool:
     return False
 
 
+def duzenle(token: str, chat_id: str, mesaj_id: int, metin: str) -> bool:
+    """Botun daha önce gönderdiği bir mesajın yazısını değiştirir (resimli mesajda resim altı yazısı)."""
+    if _istek(token, "editMessageCaption", {
+        "chat_id": chat_id, "message_id": mesaj_id, "caption": metin, "parse_mode": "HTML",
+    }):
+        return True
+    log.info("Resim altı yazısı düzenlenemedi, düz metin mesajı olarak deneniyor.")
+    return _istek(token, "editMessageText", {
+        "chat_id": chat_id, "message_id": mesaj_id, "text": metin, "parse_mode": "HTML",
+    })
+
+
 def gonder(token: str, chat_id: str, metin: str, resim_url: str | None = None) -> bool:
     """Önce küçük resimli göndermeyi dener, olmazsa düz metin (link önizlemeli) gönderir."""
     if resim_url:

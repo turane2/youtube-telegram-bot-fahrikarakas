@@ -8,7 +8,7 @@ Telegram grubuna/kanalına otomatik mesaj atar. GitHub Actions üzerinde **ücre
 | Yeni video                   | 🎬 Yeni video! + başlık + link + küçük resim    |
 | Canlı yayın planlandı        | 📅 Yayın planlandı: 21 Kasım 2026 Cumartesi, 20:00 |
 | Canlı yayın başladı          | 🔴 Canlı yayın başladı!                          |
-| İlk gösterim (prömiyer) planlandı / başladı | 🎞️ İlk gösterim planlandı: ... / 🎞️ İlk gösterim başladı! |
+| İlk gösterim (prömiyer) başladı | 🎞️ İlk gösterim başladı! (planlanınca mesaj gitmez) |
 | Shorts                       | Bildirilmez (istersen açılabilir)              |
 
 **Nasıl çalışır?** Her 5 dakikada bir kanalın RSS akışına bakar (kota harcamaz). Yeni bir şey
@@ -211,6 +211,18 @@ Repo sayfası → **Settings** → sol menü **Secrets and variables** → **Act
 | Kontrol aralığı (bilgisayar/VPS)    | `.env` → `KONTROL_ARALIGI_DAKIKA`                                      |
 
 Dosyaları GitHub sitesinde de düzenleyebilirsin: dosyaya tıkla → kalem simgesi → değiştir → **Commit changes**.
+
+### Gönderilmiş bir mesajı düzeltme
+
+Botun attığı bir mesaj yanlış ya da eski şablonla gittiyse, bot aynı mesajı yerinde güncel haline çevirebilir:
+
+1. Telegram'da mesaja sağ tık (telefonda basılı tut) → **Bağlantıyı kopyala** / **Copy Message Link**.
+2. GitHub → **Actions** → **YouTube kontrol** → **Run workflow**.
+3. **Mesaj düzelt: YouTube video linki** kutusuna videonun linkini,
+   **Mesaj düzelt: Telegram mesaj linki** kutusuna kopyaladığın linki yapıştır → **Run workflow**.
+
+Bot videonun türüne bakıp (video / canlı yayın / ilk gösterim) doğru şablonla mesajı düzenler.
+Normal çalıştırmada bu iki kutuyu boş bırak.
 
 ## 8. Sorun giderme
 

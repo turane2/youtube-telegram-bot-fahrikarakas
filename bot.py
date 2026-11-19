@@ -5,6 +5,8 @@ Kullanım:
   python bot.py            Sürekli çalışır, KONTROL_ARALIGI_DAKIKA'da bir kontrol eder (bilgisayar/VPS)
   python bot.py --bir-kez  Tek kontrol yapar ve çıkar (GitHub Actions bunu kullanır)
   python bot.py --test     Son videoyu "test" etiketiyle bir kez gönderir, hafızaya dokunmaz
+  python bot.py --duzelt VIDEO_LINKI MESAJ_LINKI
+                           Botun gönderdiği bir mesajı güncel şablonla düzenler
   python bot.py --kuru     Telegram'a hiçbir şey göndermez, gönderilecek mesajları ekrana yazar
                            (--bir-kez veya --test ile birlikte kullanılabilir)
 """
@@ -12,6 +14,7 @@ Kullanım:
 import argparse
 import html
 import logging
+import re
 import sys
 import time
 from datetime import datetime, timedelta, timezone
@@ -99,10 +102,6 @@ def baslik(item: dict) -> str:
     return item.get("snippet", {}).get("title", "")
 
 
-def planli_sablonu(item: dict) -> str:
-    return mesajlar.PROMIYER_PLANLANDI if youtube.promiyer_mu(item) else mesajlar.YAYIN_PLANLANDI
-
-
 def basladi_sablonu(item: dict) -> str:
     return mesajlar.PROMIYER_BASLADI if youtube.promiyer_mu(item) else mesajlar.CANLI_BASLADI
 
@@ -136,8 +135,10 @@ def yeni_video_isle(item: dict, ayar: Ayarlar, hafiza: Hafiza, bildirici: Bildir
 
     if tur == "planlandi":
         planli = (item.get("liveStreamingDetails") or {}).get("scheduledStartTime")
-        if ayar.planli_bildirim:
-            if not bildirici.gonder(planli_sablonu(item), item):
+        if youtube.promiyer_mu(item):
+            log.info("🎞️ İlk gösterim takibe alındı (planlandı mesajı gönderilmez): %s", baslik(item))
+        elif ayar.planli_bildirim:
+            if not bildirici.gonder(mesajlar.YAYIN_PLANLANDI, item):
                 log.warning("Planlı yayın bildirimi gönderilemedi, tekrar denenecek: %s", baslik(item))
                 return
             log.info("📅 %s planlandı, bildirildi: %s (%s)", tur_adi(item), baslik(item), turkce_tarih(planli))
@@ -263,7 +264,9 @@ def test_modu(ayar: Ayarlar, kuru: bool) -> int:
         return 1
 
     tur = youtube.video_turu(item)
-    sablon = {"planlandi": planli_sablonu(item), "canli": basladi_sablonu(item)}.get(tur)
+    sablon = {"planlandi": mesajlar.YAYIN_PLANLANDI, "canli": basladi_sablonu(item)}.get(tur)
+    if tur == "planlandi" and youtube.promiyer_mu(item):
+        sablon = mesajlar.PROMIYER_BASLADI
     if sablon is None:
         sure = youtube.sure_saniye(item)
         sablon = mesajlar.YENI_SHORTS if youtube.shorts_mu(item["id"], sure) else mesajlar.YENI_VIDEO
@@ -277,6 +280,52 @@ def test_modu(ayar: Ayarlar, kuru: bool) -> int:
     return 1
 
 
+def video_id_coz(metin: str) -> str | None:
+    """'https://youtu.be/ID', 'watch?v=ID', '/live/ID' ya da düz ID kabul eder."""
+    metin = metin.strip()
+    m = re.search(r"(?:v=|youtu\.be/|/live/|/shorts/)([A-Za-z0-9_-]{11})", metin)
+    if m:
+        return m.group(1)
+    return metin if re.fullmatch(r"[A-Za-z0-9_-]{11}", metin) else None
+
+
+def mesaj_id_coz(metin: str) -> int | None:
+    """Telegram mesaj linkinden (t.me/c/123/456 ya da t.me/grup/456) ya da düz sayıdan mesaj numarası."""
+    sayilar = re.findall(r"\d+", metin.strip().split("?")[0])
+    return int(sayilar[-1]) if sayilar else None
+
+
+def duzelt_modu(ayar: Ayarlar, video: str, mesaj: str, kuru: bool) -> int:
+    vid, mid = video_id_coz(video), mesaj_id_coz(mesaj)
+    if not vid:
+        log.error("Video linki/ID'si anlaşılamadı: '%s'", video)
+        return 1
+    if not mid:
+        log.error("Telegram mesaj linki anlaşılamadı: '%s'. Mesaja sağ tık → 'Mesaj bağlantısını kopyala'.", mesaj)
+        return 1
+    item = youtube.video_detaylari([vid], ayar.youtube_api_key).get(vid)
+    if not item:
+        log.error("YouTube bu video hakkında bilgi vermedi: %s", vid)
+        return 1
+
+    if youtube.promiyer_mu(item):
+        sablon = mesajlar.PROMIYER_BASLADI
+    elif item.get("liveStreamingDetails"):
+        sablon = mesajlar.CANLI_BASLADI
+    else:
+        sablon = mesajlar.YENI_VIDEO
+    metin = mesaj_olustur(sablon, item)
+    log.info("DÜZELTME: %d numaralı mesaj yeni haliyle değiştirilecek (%s).", mid, baslik(item))
+    if kuru:
+        log.info("[KURU MOD, düzenlenmedi]\n----\n%s\n----", metin)
+        return 0
+    if telegram_api.duzenle(ayar.telegram_token, ayar.telegram_chat_id, mid, metin):
+        log.info("✅ Mesaj düzeltildi.")
+        return 0
+    log.error("❌ Mesaj düzeltilemedi. Link doğru mu, mesajı bu bot mu göndermişti?")
+    return 1
+
+
 # ---------------------------------------------------------------- giriş noktası
 
 def main() -> int:
@@ -285,6 +334,8 @@ def main() -> int:
     p.add_argument("--bir-kez", action="store_true", help="tek kontrol yap ve çık")
     p.add_argument("--test", action="store_true", help="son videoyu test olarak gönder")
     p.add_argument("--kuru", action="store_true", help="Telegram'a gönderme, ekrana yaz")
+    p.add_argument("--duzelt", nargs=2, metavar=("VIDEO", "MESAJ"),
+                   help="gönderilmiş mesajı yeni şablonla düzelt (video linki + Telegram mesaj linki)")
     arg = p.parse_args()
 
     try:
@@ -292,6 +343,13 @@ def main() -> int:
     except AyarHatasi as e:
         log.error("%s", e)
         return 2
+
+    if arg.duzelt:
+        try:
+            return duzelt_modu(ayar, arg.duzelt[0], arg.duzelt[1], arg.kuru)
+        except youtube.YouTubeHatasi as e:
+            log.error("%s", e)
+            return 1
 
     if arg.test:
         try:

@@ -34,16 +34,7 @@ CANLI_BASLADI = (
     "📺 Hemen katıl: {link}"
 )
 
-# İlk gösterim (prömiyer) planlandığında
-PROMIYER_PLANLANDI = (
-    "🎞️ <b>İlk gösterim planlandı:</b> {tarih}\n"
-    "\n"
-    "{baslik}\n"
-    "\n"
-    "🔔 Hatırlatıcı kur: {link}"
-)
-
-# İlk gösterim (prömiyer) başladığında
+# İlk gösterim (prömiyer) başladığında. Prömiyer planlanınca mesaj gönderilmez.
 PROMIYER_BASLADI = (
     "🎞️ <b>İlk gösterim başladı!</b>\n"
     "\n"

@@ -12,6 +12,14 @@ on:
         description: "Test modu: son videoyu test etiketiyle bir kez gönder"
         type: boolean
         default: false
+      duzelt_video:
+        description: "Mesaj düzelt: YouTube video linki (normal çalıştırma için boş bırak)"
+        type: string
+        default: ""
+      duzelt_mesaj:
+        description: "Mesaj düzelt: Telegram mesaj linki (normal çalıştırma için boş bırak)"
+        type: string
+        default: ""
 
 permissions:
   contents: write      # durum.json'u repoya kaydedebilmek için
@@ -35,8 +43,18 @@ jobs:
       - run: pip install -r requirements.txt
 
       - name: Botu çalıştır
-        run: python bot.py ${{ inputs.test && '--test' || '--bir-kez' }}
+        run: |
+          if [ -n "$DUZELT_VIDEO" ] || [ -n "$DUZELT_MESAJ" ]; then
+            python bot.py --duzelt "$DUZELT_VIDEO" "$DUZELT_MESAJ"
+          elif [ "$TEST_MODU" = "true" ]; then
+            python bot.py --test
+          else
+            python bot.py --bir-kez
+          fi
         env:
+          DUZELT_VIDEO: ${{ inputs.duzelt_video }}
+          DUZELT_MESAJ: ${{ inputs.duzelt_mesaj }}
+          TEST_MODU: ${{ inputs.test }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TELEGRAM_TEST_CHAT_ID: ${{ secrets.TELEGRAM_TEST_CHAT_ID }}
@@ -47,7 +65,7 @@ jobs:
           SHORTS_BILDIRIMI: "hayir"
 
       - name: Hafızayı (durum.json) kaydet
-        if: ${{ !inputs.test }}
+        if: ${{ !inputs.test && inputs.duzelt_video == '' && inputs.duzelt_mesaj == '' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
