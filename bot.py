@@ -134,8 +134,45 @@ def normal_video_isle(item: dict, ayar: Ayarlar, hafiza: Hafiza, bildirici: Bild
         log.warning("Gönderilemedi, bir sonraki turda tekrar denenecek: %s", baslik(item))
 
 
+BILDIRILMIS = ("video", "shorts", "canli", "bitti", "planlandi")
+TEKRAR_PENCERESI = timedelta(days=14)
+
+
+def baslik_anahtari(metin: str) -> str:
+    """Karşılaştırma için: küçük harf, noktalama/emoji yok, tek boşluk."""
+    return " ".join(re.sub(r"[^\w\s]", " ", metin.casefold()).split())
+
+
+def ayni_baslikli(item: dict, hafiza: Hafiza) -> dict | None:
+    """
+    Son 14 günde aynı başlıkla bildirilmiş BAŞKA bir video var mı?
+    (Üyelere erken erişimle yüklenen video, sonra herkese açık ayrı bir video/prömiyer olarak gelirse
+    ikinci bildirim gitmesin diye.)
+    """
+    anahtar = baslik_anahtari(baslik(item))
+    if not anahtar:
+        return None
+    simdi = datetime.now(timezone.utc)
+    for vid, k in hafiza.videolar.items():
+        if vid == item["id"] or k.get("durum") not in BILDIRILMIS:
+            continue
+        eklendi = zaman_coz(k.get("eklendi"))
+        if eklendi and simdi - eklendi > TEKRAR_PENCERESI:
+            continue
+        if baslik_anahtari(k.get("baslik", "")) == anahtar:
+            return {"id": vid, **k}
+    return None
+
+
 def yeni_video_isle(item: dict, ayar: Ayarlar, hafiza: Hafiza, bildirici: Bildirici) -> None:
     vid, tur = item["id"], youtube.video_turu(item)
+
+    onceki = ayni_baslikli(item, hafiza)
+    if onceki:
+        log.info("Aynı başlıklı içerik %s tarihinde zaten bildirilmiş (%s), tekrar gönderilmiyor: %s",
+                 onceki.get("eklendi", "?")[:10], onceki["id"], baslik(item))
+        hafiza.yaz(vid, "tekrar", baslik(item), onceki=onceki["id"])
+        return
 
     if tur == "planlandi":
         planli = (item.get("liveStreamingDetails") or {}).get("scheduledStartTime")
