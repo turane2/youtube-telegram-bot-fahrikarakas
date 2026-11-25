@@ -73,11 +73,15 @@ def turkce_tarih(metin: str | None) -> str:
 def mesaj_olustur(sablon: str, item: dict) -> str:
     baslik = item.get("snippet", {}).get("title", "(başlıksız)")
     canli = item.get("liveStreamingDetails") or {}
-    return sablon.format(
+    metin = sablon.format(
         baslik=html.escape(baslik),
         link=f"https://youtu.be/{item['id']}",
         tarih=turkce_tarih(canli.get("scheduledStartTime")),
     )
+    if item.get("_uye"):  # üyelere özel: ilk satırın altına etiket
+        ilk, _, kalan = metin.partition("\n")
+        metin = f"{ilk}\n{mesajlar.UYE_ETIKETI}\n{kalan}"
+    return metin
 
 
 class Bildirici:
@@ -214,17 +218,52 @@ def ilk_kurulum(rss: list[dict], ayar: Ayarlar, hafiza: Hafiza, kuru: bool) -> N
              "%d planlı yayın takibe alındı. Bundan sonraki yeni videolar bildirilecek.", len(rss), takip)
 
 
+def uye_akisi_ilk_kurulum(uye_rss: list[dict], ayar: Ayarlar, hafiza: Hafiza) -> None:
+    """
+    Üyelere özel akış ilk kez okunuyor: eski içerikleri sessizce 'görüldü' yap.
+    Şu an canlı olanı bilinmeyen bırak ki aynı turda 🔴 bildirimi gitsin.
+    """
+    bilinmeyen = [v for v in uye_rss if not hafiza.bilinen(v["id"])]
+    detay = youtube.video_detaylari([v["id"] for v in bilinmeyen], ayar.youtube_api_key) if bilinmeyen else {}
+    sessiz = 0
+    for v in bilinmeyen:
+        item = detay.get(v["id"])
+        tur = youtube.video_turu(item) if item else "erisilemedi"
+        if tur == "canli":
+            continue
+        if tur == "planlandi":
+            planli = (item.get("liveStreamingDetails") or {}).get("scheduledStartTime")
+            hafiza.yaz(v["id"], "planlandi", v["baslik"], planlanan=planli, kayip=0, uye=True)
+        else:
+            hafiza.yaz(v["id"], {"yayin_bitti": "bitti"}.get(tur, tur), v["baslik"], uye=True)
+        sessiz += 1
+    hafiza.veri["uye_akisi"] = True
+    log.info("Üyelere özel akış ilk kez okundu: %d eski içerik bildirim gönderilmeden kaydedildi.", sessiz)
+
+
 def bir_tur(ayar: Ayarlar, hafiza: Hafiza, kuru: bool) -> None:
     rss = youtube.rss_videolari(ayar.youtube_kanal_id)
-    if not rss:
+    uye_rss = youtube.uye_rss_videolari(ayar.youtube_kanal_id)
+    uye_idler = {v["id"] for v in uye_rss}
+    rss_idler = {v["id"] for v in rss}
+    tum = rss + [v for v in uye_rss if v["id"] not in rss_idler]
+    if not tum:
         log.info("Kanalda hiç video görünmüyor.")
         return
 
     if hafiza.ilk_calisma:
-        ilk_kurulum(rss, ayar, hafiza, kuru)
+        ilk_kurulum(tum, ayar, hafiza, kuru)
+        hafiza.veri["uye_akisi"] = True
+        if not kuru:
+            hafiza.kaydet()
         return
 
-    yeniler = [v["id"] for v in rss if not hafiza.bilinen(v["id"])]
+    if uye_rss and not hafiza.veri.get("uye_akisi"):
+        uye_akisi_ilk_kurulum(uye_rss, ayar, hafiza)
+        if not kuru:
+            hafiza.kaydet()
+
+    yeniler = [v["id"] for v in tum if not hafiza.bilinen(v["id"])]
     takip = [t for t in hafiza.takiptekiler() if t not in yeniler]
     if not yeniler and not takip:
         log.info("Kontrol edildi, yeni bir şey yok.")
@@ -232,6 +271,9 @@ def bir_tur(ayar: Ayarlar, hafiza: Hafiza, kuru: bool) -> None:
 
     log.info("%d yeni video, %d bekleyen yayın kontrol ediliyor.", len(yeniler), len(takip))
     detay = youtube.video_detaylari(yeniler + takip, ayar.youtube_api_key)
+    for vid, item in detay.items():
+        if vid in uye_idler or hafiza.videolar.get(vid, {}).get("uye"):
+            item["_uye"] = True
     bildirici = Bildirici(ayar, kuru)
 
     for vid in reversed(yeniler):  # eskiden yeniye, sırayla duyur
@@ -241,6 +283,8 @@ def bir_tur(ayar: Ayarlar, hafiza: Hafiza, kuru: bool) -> None:
             hafiza.yaz(vid, "erisilemedi")
         else:
             yeni_video_isle(item, ayar, hafiza, bildirici)
+            if item.get("_uye") and hafiza.bilinen(vid):
+                hafiza.yaz(vid, hafiza.durum(vid), uye=True)
         if not kuru:
             hafiza.kaydet()  # her bildirimden sonra kaydet: çökme olursa tekrar gönderilmesin
 

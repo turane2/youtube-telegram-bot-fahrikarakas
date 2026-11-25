@@ -9,6 +9,7 @@ import requests
 log = logging.getLogger("youtube")
 
 RSS_URL = "https://www.youtube.com/feeds/videos.xml?channel_id={}"
+PLAYLIST_RSS_URL = "https://www.youtube.com/feeds/videos.xml?playlist_id={}"
 API_URL = "https://www.googleapis.com/youtube/v3/videos"
 ZAMAN_ASIMI = 20
 TARAYICI = {"User-Agent": "Mozilla/5.0 (YouTube-Telegram-Bildirim-Botu)"}
@@ -23,20 +24,38 @@ def _gizle(metin: str) -> str:
     return re.sub(r"key=[^&\s'\"]+", "key=***", str(metin))
 
 
+def uye_rss_videolari(kanal_id: str) -> list[dict]:
+    """
+    Üyelere özel içerikler (video + canlı yayın) kanalın normal RSS akışında çıkmaz.
+    YouTube bunları kanal başına otomatik tutulan "UUMO..." listesinde toplar; o listenin RSS'i okunur.
+    Hata olursa ana akışı bozmamak için boş liste döner.
+    """
+    url = PLAYLIST_RSS_URL.format("UUMO" + kanal_id[2:])
+    try:
+        return _akis_oku(url, "Üyelere özel akış")
+    except YouTubeHatasi as e:
+        log.warning("%s Bu turda üyelere özel içerik kontrol edilemedi.", e)
+        return []
+
+
 def rss_videolari(kanal_id: str) -> list[dict]:
     """Kanalın son ~15 videosu, en yeniden eskiye: [{'id':..., 'baslik':...}]"""
+    return _akis_oku(RSS_URL.format(kanal_id), "RSS akışı")
+
+
+def _akis_oku(url: str, ad: str) -> list[dict]:
     try:
-        r = requests.get(RSS_URL.format(kanal_id), headers=TARAYICI, timeout=ZAMAN_ASIMI)
+        r = requests.get(url, headers=TARAYICI, timeout=ZAMAN_ASIMI)
     except requests.RequestException as e:
-        raise YouTubeHatasi(f"RSS akışına ulaşılamadı (internet sorunu olabilir): {e}") from None
+        raise YouTubeHatasi(f"{ad} okunamadı (internet sorunu olabilir): {e}") from None
     if r.status_code == 404:
-        raise YouTubeHatasi("RSS akışı bulunamadı (404). YOUTUBE_CHANNEL_ID doğru mu?")
+        raise YouTubeHatasi(f"{ad} bulunamadı (404). YOUTUBE_CHANNEL_ID doğru mu?")
     if r.status_code != 200:
-        raise YouTubeHatasi(f"RSS akışı hata verdi (HTTP {r.status_code}).")
+        raise YouTubeHatasi(f"{ad} hata verdi (HTTP {r.status_code}).")
 
     akis = feedparser.parse(r.content)
     if akis.bozo and not akis.entries:
-        raise YouTubeHatasi("RSS akışı okunamadı (bozuk veri geldi).")
+        raise YouTubeHatasi(f"{ad} okunamadı (bozuk veri geldi).")
 
     videolar = []
     for e in akis.entries:

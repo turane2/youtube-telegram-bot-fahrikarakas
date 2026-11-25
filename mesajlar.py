@@ -52,6 +52,9 @@ YENI_SHORTS = (
     "▶️ {link}"
 )
 
+# Üyelere özel içeriklerde mesajın ilk satırının altına eklenir
+UYE_ETIKETI = "⭐ <i>Kanal üyelerine özel</i>"
+
 # Test modunda mesajın başına eklenir
 TEST_ON_EKI = "🧪 <i>Test mesajı, dikkate almayın</i>\n\n"
 
